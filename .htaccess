@@ -1,0 +1,34 @@
+RewriteEngine On
+
+# --- HTTPS / HSTS (SEC-001) ---
+# HSTS header added only after deploy validation; enabled here, tighten at prod.
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+</IfModule>
+
+# --- Security headers (SEC-013) are emitted by PHP (config/autoload.php -> Routlaw\Security\Headers).
+# This .htaccess blocks sensitive paths and enforces no-public-doc access.
+
+# --- Block sensitive directories/files from web access (SEC-007, FR-025) ---
+# Under XAMPP the docroot is htdocs/, so these paths arrive as /Routlaw/...
+<FilesMatch "^(secrets\.local\.php|composer\.phar|\.env|\.env\.local|.*\.sql)$">
+    Require all denied
+</FilesMatch>
+RedirectMatch 403 ^/Routlaw/config/
+RedirectMatch 403 ^/Routlaw/migrations/
+RedirectMatch 403 ^/Routlaw/storage/
+RedirectMatch 403 ^/Routlaw/vendor/
+RedirectMatch 403 ^/Routlaw/\.git/
+RedirectMatch 403 ^/Routlaw/src/
+RedirectMatch 403 ^/Routlaw/scripts/
+
+# --- Front controller (if/when routing is added) ---
+# RewriteCond %{REQUEST_FILENAME} !-f
+# RewriteRule ^ index.php [L]
+
+# --- Deny script execution in storage/uploads (storage is outside docroot;
+#     web access already blocked above; this guards the dir if symlinked/mounted) ---
+# Place a matching .htaccess inside storage/ if it is ever served:
+#   Options -ExecCGI -Indexes
+#   php_flag engine off
+#   Require all denied

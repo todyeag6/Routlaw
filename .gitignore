@@ -1,0 +1,29 @@
+# Secrets / local config
+config/secrets.local.php
+*.local.php
+.env
+.env.local
+
+# Vendor (committed only if project policy requires; we vendor phpunit for local runs)
+/vendor/
+
+# Scratch / extraction artifacts
+.extract_venv/
+__pycache__/
+*.pyc
+_recheck.py
+_extract.py
+_*.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.bak
+*.bak-*
+
+# Private document storage content (metadata only in DB)
+storage/documents/*
+!storage/documents/.gitkeep
+
+# PHPUnit cache
+.phpunit.cache/

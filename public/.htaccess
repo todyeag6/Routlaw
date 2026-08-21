@@ -1,0 +1,19 @@
+# ROUTLAW public/ — the ONLY web-served directory (build-plan §3 T1.4).
+# Private dirs (config/, src/, migrations/, storage/, vendor/, scripts/) live
+# OUTSIDE this docroot and are therefore not reachable at all under the vhost.
+# This file hardens what IS served from public/.
+
+RewriteEngine On
+
+# --- Block hidden/server files in public/ (defense-in-depth) ---
+<FilesMatch "^(secrets\.local\.php|\.env|\.env\.local|.*\.sql|\.ht)">
+    Require all denied
+</FilesMatch>
+
+# --- Front controller (enable when routing is added; index.php is the entry) ---
+# RewriteCond %{REQUEST_FILENAME} !-f
+# RewriteCond %{REQUEST_FILENAME} !-d
+# RewriteRule ^ index.php [L]
+
+# --- No directory listings, no execution of uploaded content ---
+Options -Indexes -ExecCGI
