@@ -172,14 +172,85 @@ final class DecisionService
     }
 
     /**
-     * Guard against the bind_param type-count pitfall (mem_3ac32f9e4c59): a shifted type
-     * string causes SILENT data truncation with no error. Assert arity before execute.
+     * T13.1 — record a counterparty (broker/shipper) observation (FR-057). Tenant-scoped.
      *
-     * @param list<mixed> $params
+     * @return int observation id
      */
+    public function recordCounterpartyObservation(
+        int $companyId,
+        ?int $decisionCaseId,
+        string $counterpartyType,
+        ?string $counterpartyRef,
+        string $observation,
+        string $severity,
+        int $actorId
+    ): int {
+        $stmt = $this->db->prepare(
+            'INSERT INTO counterparty_observations '
+            . '(company_id, decision_case_id, counterparty_type, counterparty_ref, observation, severity, created_by) '
+            . 'VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
+        if ($stmt === false) {
+            throw new \RuntimeException('Failed to prepare counterparty_observations insert: ' . $this->db->error);
+        }
+        $params = [$companyId, $decisionCaseId, $counterpartyType, $counterpartyRef, $observation, $severity, $actorId];
+        $types = 'iissssi';
+        $this->assertBindArity($stmt, $types, $params);
+        $stmt->bind_param($types, ...$params);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new \RuntimeException('Failed to record counterparty observation: ' . $this->db->error);
+        }
+        $id = (int) $this->db->insert_id;
+        $stmt->close();
+        (new AuditLog($this->db))->recordSystem('decision.counterparty_observation', $companyId, 'user', 'create',
+            ['observation_id' => $id, 'severity' => $severity], 'counterparty_observations', (string) $id);
+        return $id;
+    }
+
     /**
-     * Guard against the bind_param type-count pitfall (mem_3ac32f9e4c59): a shifted type
-     * string causes SILENT data truncation with no error. Assert arity before execute.
+     * T13.1 — record a facility (pickup/delivery/reload) observation + uncertainty (FR-058).
+     * The uncertainty field is explicit so reload/downstream positioning is never silently assumed.
+     *
+     * @return int observation id
+     */
+    public function recordFacilityObservation(
+        int $companyId,
+        ?int $decisionCaseId,
+        string $facilityType,
+        ?string $facilityRef,
+        string $observation,
+        ?string $uncertainty,
+        string $severity,
+        int $actorId
+    ): int {
+        $stmt = $this->db->prepare(
+            'INSERT INTO facility_observations '
+            . '(company_id, decision_case_id, facility_type, facility_ref, observation, uncertainty, severity, created_by) '
+            . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        if ($stmt === false) {
+            throw new \RuntimeException('Failed to prepare facility_observations insert: ' . $this->db->error);
+        }
+        $params = [$companyId, $decisionCaseId, $facilityType, $facilityRef, $observation, $uncertainty, $severity, $actorId];
+        $types = 'iisssssi';
+        $this->assertBindArity($stmt, $types, $params);
+        $stmt->bind_param($types, ...$params);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new \RuntimeException('Failed to record facility observation: ' . $this->db->error);
+        }
+        $id = (int) $this->db->insert_id;
+        $stmt->close();
+        (new AuditLog($this->db))->recordSystem('decision.facility_observation', $companyId, 'user', 'create',
+            ['observation_id' => $id, 'severity' => $severity], 'facility_observations', (string) $id);
+        return $id;
+    }
+
+    /**
+     * Guard against the bind_param type-count pitfall (mem_3ac32f9e4c59): a shifted or wrong
+     * type string causes SILENT data truncation with no error. Assert BOTH arity AND that
+     * each type char matches the runtime type of its param (catches 'i' used for a string).
      *
      * @param list<mixed> $params
      */
@@ -191,6 +262,24 @@ final class DecisionService
                 'bind_param type/param arity mismatch: %d types vs %d params',
                 strlen($types), count($params)
             ));
+        }
+        $expected = ['i' => 'integer', 'd' => 'double', 's' => 'string', 'b' => 'string'];
+        foreach ($params as $i => $p) {
+            if ($p === null) {
+                continue; // null binds as SQL NULL for any type
+            }
+            $t = $types[$i];
+            $want = $expected[$t] ?? null;
+            if ($want === null) {
+                continue;
+            }
+            if (gettype($p) !== $want) {
+                $stmt->close();
+                throw new \LogicException(sprintf(
+                    'bind_param type mismatch at param %d: type "%s" expects %s, got %s',
+                    $i, $t, $want, gettype($p)
+                ));
+            }
         }
     }
 
