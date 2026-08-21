@@ -147,28 +147,28 @@ final class HardGateTest extends TestCase
         }
     }
 
-    public function test_hazmat_unknown_abstains_no_fabrication(): void
+    public function test_hazmat_unknown_is_not_applicable_pass_no_fabrication(): void
     {
         $results = $this->engine->evaluateCompliance($this->carrier(), [], null);
         $hz = $this->find($results, 'hazmat');
-        $this->assertTrue($hz->isAbstain(), 'No hazmat data in system → ABSTAIN, never invent a class.');
-        $this->assertSame('hazmat_unknown', $hz->reason);
+        $this->assertTrue($hz->isPass(), 'No hazmat declared → not applicable PASS; never invent a class.');
+        $this->assertSame('not_applicable', $hz->reason);
     }
 
-    public function test_hos_applicability_unknown_abstains(): void
+    public function test_hos_applicability_unknown_is_assumption_pass(): void
     {
         $results = $this->engine->evaluateCompliance($this->carrier(), [], null);
         $hos = $this->find($results, 'hos');
-        $this->assertTrue($hos->isAbstain(), 'No HOS applicability data → ABSTAIN (FRD §19.2 uncertainty).');
-        $this->assertSame('hos_applicability_unknown', $hos->reason);
+        $this->assertTrue($hos->isPass(), 'Unknown HOS applicability → PASS assumption, not a hard block (FRD §19.2).');
+        $this->assertSame('applicability_unknown_assumption', $hos->reason);
     }
 
-    public function test_eld_applicability_unknown_abstains(): void
+    public function test_eld_applicability_unknown_is_assumption_pass(): void
     {
         $results = $this->engine->evaluateCompliance($this->carrier(), [], null);
         $eld = $this->find($results, 'eld');
-        $this->assertTrue($eld->isAbstain(), 'No ELD applicability data → ABSTAIN (FRD §19.2 uncertainty).');
-        $this->assertSame('eld_applicability_unknown', $eld->reason);
+        $this->assertTrue($eld->isPass(), 'Unknown ELD applicability → PASS assumption, not a hard block (FRD §19.2).');
+        $this->assertSame('applicability_unknown_assumption', $eld->reason);
     }
 
     private function find(array $results, string $gate): GateResult
