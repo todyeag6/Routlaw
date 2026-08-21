@@ -142,7 +142,7 @@ final class EquipmentProfileService
             'carrier_id'  => $carrierId,
             'truck_type'  => $truckType,
             'is_complete' => $isComplete,
-        ]);
+        ], 'equipment_profile', (string) $id);
 
         return $id;
     }
@@ -314,6 +314,42 @@ final class EquipmentProfileService
             $bind[] = &$params[$key];
         }
         $stmt->bind_param(...$bind);
+    }
+
+    /**
+     * Soft-delete an equipment profile (regulated entity — never hard-delete; BR-020 audit).
+     * Tenant-scoped: only affects a profile owned by $companyId.
+     *
+     * @param int    $profileId  Profile to delete.
+     * @param int    $companyId  Tenant scope (FR-042) — defense-in-depth.
+     * @param int    $actorId    Acting user id (audit).
+     * @param string $reason     Reason for deletion (compliance record).
+     * @return bool True if a row was soft-deleted.
+     */
+    public function softDelete(int $profileId, int $companyId, int $actorId, string $reason): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE equipment_profiles SET deleted_at = NOW(), deleted_by = ?, delete_reason = ? '
+            . 'WHERE id = ? AND company_id = ? AND deleted_at IS NULL'
+        );
+        if ($stmt === false) {
+            throw new \RuntimeException('Failed to prepare profile soft-delete: ' . $this->db->error);
+        }
+        $stmt->bind_param('isii', $actorId, $reason, $profileId, $companyId);
+        $ok = $stmt->execute();
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+
+        if ($ok && $affected > 0) {
+            $audit = new AuditLog($this->db);
+            $audit->recordSystem('equipment.delete', $companyId, 'user', 'soft_delete', [
+                'profile_id' => $profileId,
+                'reason'     => $reason,
+                'actor_id'   => $actorId,
+            ], 'equipment_profile', (string) $profileId);
+            return true;
+        }
+        return false;
     }
 
     /**

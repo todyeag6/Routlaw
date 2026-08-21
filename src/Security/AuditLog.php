@@ -56,17 +56,26 @@ final class AuditLog
      * @param string     $actorType  'system' or 'agent'.
      * @param string     $action     The action performed.
      * @param array|null $detail
+     * @param string|null $targetType Entity type being acted on (e.g. 'carrier').
+     * @param string|null $targetId   Entity id being acted on (queryable for traceability).
      */
-    public function recordSystem(string $eventType, ?int $companyId, string $actorType, string $action, ?array $detail = null): void
-    {
+    public function recordSystem(
+        string $eventType,
+        ?int $companyId,
+        string $actorType,
+        string $action,
+        ?array $detail = null,
+        ?string $targetType = null,
+        ?string $targetId = null
+    ): void {
         $this->insert(
             $companyId ?? 0,
             $actorType,
             0,
             $eventType,
             $action,
-            null,
-            null,
+            $targetType,
+            $targetId,
             // System events are always logged as 'success' (no failed system actions).
             'success',
             $detail

@@ -220,6 +220,30 @@ final class EquipmentProfileTest extends TestCase
     }
 
     /**
+     * BR-020: equipment profile is soft-deleted, hidden from list, and audited.
+     */
+    public function test_profile_soft_delete_hides_and_audits(): void
+    {
+        $id = $this->createValidProfile(['truck_type' => 'Flatbed Del']);
+
+        $ok = self::$svc->softDelete($id, $this->companyA, $this->dispatcher, 'offboard');
+        $this->assertTrue($ok, 'Soft-delete must succeed for owning tenant.');
+
+        // Gone from the active list.
+        $ids = array_column(self::$svc->listForTenant($this->companyA, $this->carrierId), 'id');
+        $this->assertNotContains((int) $id, $ids, 'Soft-deleted profile must not appear in list.');
+
+        // Still physically present with audit metadata.
+        $row = self::$m->query('SELECT deleted_at, deleted_by, delete_reason FROM equipment_profiles WHERE id = ' . (int) $id)->fetch_assoc();
+        $this->assertNotNull($row['deleted_at'], 'deleted_at must be set.');
+        $this->assertSame((string) $this->dispatcher, $row['deleted_by']);
+
+        // Audit event emitted.
+        $cnt = (int) self::$m->query("SELECT COUNT(*) FROM audit_events WHERE event_type='equipment.delete' AND target_id='" . (int) $id . "'")->fetch_column();
+        $this->assertSame(1, $cnt, 'Soft-delete must be audited (BR-020).');
+    }
+
+    /**
      * Helper: create a valid equipment profile with optional overrides.
      * @param array{
      *   truck_type?: string,

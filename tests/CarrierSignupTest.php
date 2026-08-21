@@ -178,4 +178,45 @@ final class CarrierSignupTest extends TestCase
         $carrierIds = array_column($carriers, 'id');
         $this->assertNotContains((int) $id, $carrierIds, 'Other tenant must not see this carrier (SEC-010/FR-042).');
     }
+
+    /** BR-020: carrier is soft-deleted, hidden from list, and audited (never hard-deleted). */
+    public function test_carrier_soft_delete_hides_and_audits(): void
+    {
+        $id = self::$svc->signup($this->companyA, 'Alpha Haul', '', 'DOT-DEL', 'MC-1', 'EIN-1');
+
+        $ok = self::$svc->softDelete($id, $this->companyA, $this->dispatcherRole, 'compliance offboard');
+        $this->assertTrue($ok, 'Soft-delete must succeed for owning tenant.');
+
+        // Gone from the active list.
+        $carrierIds = array_column(self::$svc->listForTenant($this->companyA), 'id');
+        $this->assertNotContains((int) $id, $carrierIds, 'Soft-deleted carrier must not appear in list.');
+
+        // Still physically present (not hard-deleted) with audit metadata.
+        $row = self::$m->query('SELECT deleted_at, deleted_by, delete_reason FROM carriers WHERE id = ' . (int) $id)->fetch_assoc();
+        $this->assertNotNull($row['deleted_at'], 'deleted_at must be set.');
+        $this->assertSame((string) $this->dispatcherRole, $row['deleted_by']);
+        $this->assertSame('compliance offboard', $row['delete_reason']);
+
+        // Audit event emitted.
+        $cnt = (int) self::$m->query("SELECT COUNT(*) FROM audit_events WHERE event_type='carrier.delete' AND target_id='" . (int) $id . "'")->fetch_column();
+        $this->assertSame(1, $cnt, 'Soft-delete must be audited (BR-020).');
+    }
+
+    /** SEC-010/FR-042: cross-tenant soft-delete must not affect another tenant's carrier. */
+    public function test_carrier_soft_delete_is_tenant_scoped(): void
+    {
+        $idA = self::$svc->signup($this->companyA, 'Alpha Haul', '', 'DOT-D-A', 'MC-1', 'EIN-1');
+        $idB = self::$svc->signup($this->companyB, 'Beta Haul', '', 'DOT-D-B', 'MC-2', 'EIN-2');
+
+        // Company B tries to delete company A's carrier — must be a no-op.
+        $ok = self::$svc->softDelete($idA, $this->companyB, $this->dispatcherRole, 'wrong tenant');
+        $this->assertFalse($ok, 'Cross-tenant soft-delete must fail (FR-042).');
+
+        $row = self::$m->query('SELECT deleted_at FROM carriers WHERE id = ' . (int) $idA)->fetch_assoc();
+        $this->assertNull($row['deleted_at'], 'Company A carrier must remain active.');
+
+        // And B deleting its own still works.
+        $okB = self::$svc->softDelete($idB, $this->companyB, $this->dispatcherRole, 'ok');
+        $this->assertTrue($okB);
+    }
 }

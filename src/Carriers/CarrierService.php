@@ -106,7 +106,7 @@ final class CarrierService
             'carrier_id' => $id,
             'legal_name' => $legalName,
             'status'     => $status,
-        ]);
+        ], 'carrier', (string) $id);
 
         return $id;
     }
@@ -200,6 +200,42 @@ final class CarrierService
         $row = $result !== false ? $result->fetch_assoc() : false;
         $stmt->close();
         return ($row === null || $row === false) ? null : (string) ($row['status'] ?? '');
+    }
+
+    /**
+     * Soft-delete a carrier (regulated entity — never hard-delete; BR-020 audit trail).
+     * Tenant-scoped: only affects a carrier owned by $companyId.
+     *
+     * @param int    $carrierId  Carrier to delete.
+     * @param int    $companyId  Tenant scope (FR-042) — defense-in-depth.
+     * @param int    $actorId    Acting user id (audit).
+     * @param string $reason     Reason for deletion (compliance record).
+     * @return bool True if a row was soft-deleted.
+     */
+    public function softDelete(int $carrierId, int $companyId, int $actorId, string $reason): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE carriers SET deleted_at = NOW(), deleted_by = ?, delete_reason = ? '
+            . 'WHERE id = ? AND company_id = ? AND deleted_at IS NULL'
+        );
+        if ($stmt === false) {
+            throw new \RuntimeException('Failed to prepare carrier soft-delete: ' . $this->db->error);
+        }
+        $stmt->bind_param('isii', $actorId, $reason, $carrierId, $companyId);
+        $ok = $stmt->execute();
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+
+        if ($ok && $affected > 0) {
+            $audit = new AuditLog($this->db);
+            $audit->recordSystem('carrier.delete', $companyId, 'user', 'soft_delete', [
+                'carrier_id' => $carrierId,
+                'reason'     => $reason,
+                'actor_id'   => $actorId,
+            ], 'carrier', (string) $carrierId);
+            return true;
+        }
+        return false;
     }
 
     /**

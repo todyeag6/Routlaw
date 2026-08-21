@@ -22,6 +22,17 @@ if (is_file($autoloader)) {
 }
 
 // --- Secrets (gitignored; never committed) ---
+// Best practice: production MUST supply a least-privilege DB user via secrets.local.php
+// (single schema; SELECT/INSERT/UPDATE/DELETE/EXECUTE only — NO DROP/ALTER/GRANT).
+// The 'root'/empty defaults below are DEV-ONLY fallbacks for local XAMPP. Running prod
+// with root is a compliance/security defect and will be flagged by the bootstrap.
+$isProd = ($_ENV['RL_ENV'] ?? 'dev') === 'prod';
+if ($isProd && ($_ENV['RL_DB_USER'] ?? 'root') === 'root') {
+    // Loud failure rather than silently running prod as root.
+    throw new \RuntimeException(
+        'RL_DB_USER is root in production. Supply a least-privilege DB user in secrets.local.php.'
+    );
+}
 $_ENV['RL_DB_HOST']   ??= '127.0.0.1';
 $_ENV['RL_DB_USER']   ??= 'root';
 $_ENV['RL_DB_PASS']   ??= '';
