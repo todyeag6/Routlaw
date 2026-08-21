@@ -50,7 +50,11 @@ final class DecisionAlternativeTest extends TestCase
         Connection::applyFile(self::$m, __DIR__ . '/../migrations/000_init_foundation.sql');
         self::$m->query("INSERT INTO companies (legal_name, display_name) VALUES ('CoA LLC','CoA')");
         $this->companyA = (int) self::$m->insert_id;
+        self::$m->query("INSERT INTO companies (legal_name, display_name) VALUES ('CoB LLC','CoB')");
+        $this->companyB = (int) self::$m->insert_id;
     }
+
+    private int $companyB;
 
     public function test_clear_gate_yields_structured_alternatives_with_required_fields(): void
     {
@@ -128,5 +132,41 @@ final class DecisionAlternativeTest extends TestCase
             }
         }
         $this->assertTrue($hasAbstain, 'Missing mandatory evidence must produce an abstain alternative (BR-005).');
+    }
+
+    // ----- T12.3: persist decision case + tenant-scoped CRUD -----
+
+    public function test_create_case_persists_and_reads_back_scoped(): void
+    {
+        $caseId = self::$svc->createCase($this->companyA, null, 10, 20, 'clear', 'accept', 'Routlaw note', 1);
+        $this->assertGreaterThan(0, $caseId);
+        $row = self::$svc->getCase($this->companyA, $caseId);
+        $this->assertNotNull($row, 'Case must read back in its tenant.');
+        $this->assertSame($this->companyA, (int) $row['company_id']);
+        $this->assertSame('accept', $row['selected_alternative']);
+        $this->assertSame('Routlaw note', $row['decision_note']);
+    }
+
+    public function test_cross_tenant_case_not_visible(): void
+    {
+        $caseId = self::$svc->createCase($this->companyA, null, 10, 20, 'clear', 'accept', 'note', 1);
+        // Company B querying Company A's case must return null (no leakage, FR-042).
+        $rowB = self::$svc->getCase($this->companyB, $caseId);
+        $this->assertNull($rowB, 'Other tenant must not see this case.');
+    }
+
+    public function test_write_path_scoped_blocks_wrong_tenant(): void
+    {
+        // Insert a case owned by A, then attempt a scoped update as B → 0 rows affected.
+        $caseId = self::$svc->createCase($this->companyA, null, 10, 20, 'clear', 'accept', 'note', 1);
+        $stmt = self::$m->prepare('UPDATE decision_cases SET status = ? WHERE id = ? AND company_id = ?');
+        $status = 'approved';
+        $stmt->bind_param('sii', $status, $caseId, $this->companyB);
+        $stmt->execute();
+        $this->assertSame(0, $stmt->affected_rows, 'Scoped write as wrong tenant affects 0 rows (FR-042).');
+        // Owner can update.
+        $stmt->bind_param('sii', $status, $caseId, $this->companyA);
+        $stmt->execute();
+        $this->assertSame(1, $stmt->affected_rows, 'Owner scoped write affects 1 row.');
     }
 }

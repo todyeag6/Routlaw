@@ -95,6 +95,105 @@ final class DecisionService
         return $alternatives;
     }
 
+    /**
+     * Persist a decision case, tenant-scoped (FR-042). Write path always scopes by company_id.
+     *
+     * @param int|null $gateResultId FK to gate_results (T10.3), or null.
+     * @param int|null $loadId
+     * @param int|null $carrierId
+     * @param string $status clear|needs_review|recommended|rejected|approved.
+     * @param string|null $selectedAlternative accept|reject|negotiate|delay|combine|avoid|abstain|null.
+     * @param string|null $decisionNote Reason-coded note (visible hard-fail reasons, FRD §6.1).
+     * @return int decision_case id.
+     */
+    public function createCase(
+        int $companyId,
+        ?int $gateResultId,
+        ?int $loadId,
+        ?int $carrierId,
+        string $status,
+        ?string $selectedAlternative,
+        ?string $decisionNote,
+        int $actorId
+    ): int {
+        $stmt = $this->db->prepare(
+            'INSERT INTO decision_cases '
+            . '(company_id, gate_result_id, load_id, carrier_id, status, selected_alternative, decision_note, created_by) '
+            . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        if ($stmt === false) {
+            throw new \RuntimeException('Failed to prepare decision_cases insert: ' . $this->db->error);
+        }
+        $params = [$companyId, $gateResultId, $loadId, $carrierId, $status, $selectedAlternative, $decisionNote, $actorId];
+        $types = 'iiiisssi';
+        $this->assertBindArity($stmt, $types, $params);
+        $stmt->bind_param($types, ...$params);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new \RuntimeException('Failed to create decision case: ' . $this->db->error);
+        }
+        $id = (int) $this->db->insert_id;
+        $stmt->close();
+
+        $audit = new AuditLog($this->db);
+        $audit->recordSystem('decision.create_case', $companyId, 'user', 'create', [
+            'decision_case_id' => $id,
+            'status' => $status,
+            'selected_alternative' => $selectedAlternative,
+        ], 'decision_cases', (string) $id);
+
+        return $id;
+    }
+
+    /**
+     * Read back a decision case, tenant-scoped. Returns null if not found in this tenant
+     * (defense-in-depth: write path is scoped; read path is scoped too).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getCase(int $companyId, int $caseId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT * FROM decision_cases WHERE id = ? AND company_id = ? AND deleted_at IS NULL'
+        );
+        if ($stmt === false) {
+            throw new \RuntimeException('Failed to prepare decision_cases select: ' . $this->db->error);
+        }
+        $stmt->bind_param('ii', $caseId, $companyId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            throw new \RuntimeException('Failed to fetch decision case: ' . $this->db->error);
+        }
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        return ($row === null || $row === false) ? null : $row;
+    }
+
+    /**
+     * Guard against the bind_param type-count pitfall (mem_3ac32f9e4c59): a shifted type
+     * string causes SILENT data truncation with no error. Assert arity before execute.
+     *
+     * @param list<mixed> $params
+     */
+    /**
+     * Guard against the bind_param type-count pitfall (mem_3ac32f9e4c59): a shifted type
+     * string causes SILENT data truncation with no error. Assert arity before execute.
+     *
+     * @param list<mixed> $params
+     */
+    private function assertBindArity(\mysqli_stmt $stmt, string $types, array $params): void
+    {
+        if (strlen($types) !== count($params)) {
+            $stmt->close();
+            throw new \LogicException(sprintf(
+                'bind_param type/param arity mismatch: %d types vs %d params',
+                strlen($types), count($params)
+            ));
+        }
+    }
+
     private function acceptStatus(GateEvaluation $gate, bool $scheduleConflict): string
     {
         if ($gate->isBlocked()) {
