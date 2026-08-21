@@ -71,4 +71,41 @@ final class EconomicsService
             $rate
         );
     }
+
+    /**
+     * Compute total-mile/time economics rollup: total cost from the active versioned profile,
+     * plus net vs the operator-entered posted_rate. Abstains (never fabricates) when the
+     * mandatory inputs are missing (no active profile, or per_mile/percentage without distance,
+     * or no posted_rate for net). When computed, tags the source profile version + effective_from
+     * so the figure is reproducible (FR-051). Tenant-scoped (FR-042).
+     *
+     * @param array<string,mixed> $load Load record (posted_rate, ...).
+     * @param float|null $distanceMiles Operator-entered distance (null ⇒ abstain for per_mile/percentage).
+     * @param string $asOf Date to resolve the active profile.
+     */
+    public function rollup(int $companyId, int $carrierId, array $load, ?float $distanceMiles, string $asOf = 'today'): EconomicsRollup
+    {
+        $cost = $this->totalCost($companyId, $carrierId, $distanceMiles, $asOf);
+        if (!$cost->isComputed()) {
+            return new EconomicsRollup(false, $cost->reason, null, null, null, null, null, null, null, null);
+        }
+
+        $postedRate = $this->nullOrFloat($load['posted_rate'] ?? null);
+        if ($postedRate === null) {
+            return new EconomicsRollup(false, 'posted_rate_required', $cost->totalCost, $cost->costProfileId,
+                $cost->effectiveFrom, $cost->unitType, $cost->rate, null, null, null);
+        }
+
+        $net = round($postedRate - $cost->totalCost, 2);
+        return new EconomicsRollup(true, 'computed', $cost->totalCost, $cost->costProfileId,
+            $cost->effectiveFrom, $cost->unitType, $cost->rate, $postedRate, $net, $distanceMiles);
+    }
+
+    private function nullOrFloat(mixed $v): ?float
+    {
+        if ($v === null || $v === '') {
+            return null;
+        }
+        return (float) $v;
+    }
 }

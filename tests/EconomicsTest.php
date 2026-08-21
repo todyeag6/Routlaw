@@ -109,4 +109,45 @@ final class EconomicsTest extends TestCase
         $this->assertSame($r1->costProfileId, $r2->costProfileId);
         $this->assertSame($r1->effectiveFrom, $r2->effectiveFrom);
     }
+
+    // ----- T11.2: total-mile/time rollup + honest abstention -----
+
+    public function test_rollup_computes_net_vs_posted_rate(): void
+    {
+        self::$costSvc->createVersion($this->companyA, $this->carrierId, 'per_mile', 1.50, '2026-08-01', null, true);
+        $load = ['posted_rate' => 450.00];
+        $r = self::$econ->rollup($this->companyA, $this->carrierId, $load, 200.0, '2026-08-15');
+        $this->assertTrue($r->isComputed(), 'Rollup must compute when all inputs present.');
+        $this->assertSame(300.0, $r->totalCost);
+        $this->assertSame(450.0, $r->postedRate);
+        $this->assertSame(150.0, $r->net, 'net = posted_rate − totalCost = 150.00.');
+    }
+
+    public function test_rollup_abstains_without_posted_rate(): void
+    {
+        self::$costSvc->createVersion($this->companyA, $this->carrierId, 'per_mile', 1.50, '2026-08-01', null, true);
+        $r = self::$econ->rollup($this->companyA, $this->carrierId, [], 200.0, '2026-08-15');
+        $this->assertFalse($r->isComputed(), 'No posted_rate → ABSTAIN net, never guess.');
+        $this->assertSame('posted_rate_required', $r->reason);
+        $this->assertNull($r->net);
+    }
+
+    public function test_rollup_abstains_without_distance_for_per_mile(): void
+    {
+        self::$costSvc->createVersion($this->companyA, $this->carrierId, 'per_mile', 1.50, '2026-08-01', null, true);
+        $r = self::$econ->rollup($this->companyA, $this->carrierId, ['posted_rate' => 450.0], null, '2026-08-15');
+        $this->assertFalse($r->isComputed(), 'per_mile without distance → ABSTAIN, never fabricate miles.');
+        $this->assertSame('distance_required', $r->reason);
+    }
+
+    public function test_rollup_reproducible_from_stored_version(): void
+    {
+        $cpId = self::$costSvc->createVersion($this->companyA, $this->carrierId, 'per_mile', 1.50, '2026-08-01', null, true);
+        $r1 = self::$econ->rollup($this->companyA, $this->carrierId, ['posted_rate' => 450.0], 200.0, '2026-08-15');
+        $r2 = self::$econ->rollup($this->companyA, $this->carrierId, ['posted_rate' => 450.0], 200.0, '2026-08-15');
+        $this->assertSame($r1->totalCost, $r2->totalCost);
+        $this->assertSame($r1->net, $r2->net);
+        $this->assertSame($cpId, $r1->costProfileId);
+        $this->assertSame('2026-08-01', $r1->effectiveFrom);
+    }
 }
