@@ -274,4 +274,16 @@ final class CostProfileTest extends TestCase
         $active = self::$svc->getActiveAt(99999, $this->carrierId, '2026-08-15');
         $this->assertNull($active, 'Other tenant must not see this profile (SEC-010/FR-042).');
     }
+
+    /**
+     * listForCarrier returns all versions for a carrier, tenant-scoped.
+     */
+    public function test_list_for_carrier_returns_all_versions(): void
+    {
+        self::$svc->createVersion($this->companyA, $this->carrierId, 'per_mile', 1.00, '2026-08-01', null, true);
+        self::$svc->createVersion($this->companyA, $this->carrierId, 'flat', 500.00, '2026-09-01', null, true);
+
+        $profiles = self::$svc->listForCarrier($this->companyA, $this->carrierId);
+        $this->assertCount(2, $profiles, 'listForCarrier must return all versions for this carrier.');
+    }
 }

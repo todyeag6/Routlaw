@@ -147,7 +147,7 @@ final class CostProfileService
     public function listForCarrier(int $companyId, int $carrierId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, unit_type, rate, effective_from, effective_to, version, is_complete, status '
+            'SELECT id, unit_type, rate, effective_from, effective_to, version, is_complete, created_at '
             . 'FROM carrier_cost_profiles '
             . 'WHERE company_id = ? AND carrier_id = ? AND deleted_at IS NULL '
             . 'ORDER BY version DESC'
