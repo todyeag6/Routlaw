@@ -2,7 +2,7 @@ parameters:
     level: 8
     paths:
         - src/
-    scanFiles:
-        - stubs.php
+    dynamicConstantNames:
+        - ROUTLAW_NO_SESSION
 includes:
     - phpstan-baseline.neon
