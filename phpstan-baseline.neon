@@ -1,0 +1,131 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^Parameter \\#2 \\$string of function explode expects string, string\\|null given\\.$#"
+			count: 1
+			path: src/Db/Connection.php
+
+		-
+			message: "#^Method Routlaw\\\\Guard\\:\\:decide\\(\\) has parameter \\$violations with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Guard.php
+
+		-
+			message: "#^Cannot call method bind_param\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 4
+			path: src/Security/AuditLog.php
+
+		-
+			message: "#^Cannot call method close\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 4
+			path: src/Security/AuditLog.php
+
+		-
+			message: "#^Cannot call method execute\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 4
+			path: src/Security/AuditLog.php
+
+		-
+			message: "#^Cannot call method fetch_assoc\\(\\) on mysqli_result\\|false\\.$#"
+			count: 1
+			path: src/Security/AuditLog.php
+
+		-
+			message: "#^Cannot call method get_result\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 1
+			path: src/Security/AuditLog.php
+
+		-
+			message: "#^Method Routlaw\\\\Security\\\\AuditLog\\:\\:insert\\(\\) has parameter \\$detail with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Security/AuditLog.php
+
+		-
+			message: "#^Method Routlaw\\\\Security\\\\AuditLog\\:\\:record\\(\\) has parameter \\$detail with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Security/AuditLog.php
+
+		-
+			message: "#^Method Routlaw\\\\Security\\\\AuditLog\\:\\:recordSystem\\(\\) has parameter \\$detail with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Security/AuditLog.php
+
+		-
+			message: "#^Cannot call method bind_param\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 9
+			path: src/Security/Auth.php
+
+		-
+			message: "#^Cannot call method close\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 10
+			path: src/Security/Auth.php
+
+		-
+			message: "#^Cannot call method execute\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 9
+			path: src/Security/Auth.php
+
+		-
+			message: "#^Cannot call method fetch_assoc\\(\\) on mysqli_result\\|false\\.$#"
+			count: 1
+			path: src/Security/Auth.php
+
+		-
+			message: "#^Cannot call method fetch_column\\(\\) on mysqli_result\\|false\\.$#"
+			count: 1
+			path: src/Security/Auth.php
+
+		-
+			message: "#^Cannot call method get_result\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 2
+			path: src/Security/Auth.php
+
+		-
+			message: "#^Method Routlaw\\\\Security\\\\Auth\\:\\:audit\\(\\) has parameter \\$detail with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Security/Auth.php
+
+		-
+			message: "#^Method Routlaw\\\\Security\\\\Auth\\:\\:findUserByEmail\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Security/Auth.php
+
+		-
+			message: "#^Parameter \\#1 \\$name of function setcookie expects string, string\\|false given\\.$#"
+			count: 1
+			path: src/Security/Auth.php
+
+		-
+			message: "#^Cannot access offset 'company_id' on array\\<string, float\\|int\\|string\\|null\\>\\|false\\.$#"
+			count: 1
+			path: src/Security/Authorization.php
+
+		-
+			message: "#^Cannot access offset 'id' on array\\<string, float\\|int\\|string\\|null\\>\\|false\\.$#"
+			count: 1
+			path: src/Security/Authorization.php
+
+		-
+			message: "#^Cannot call method bind_param\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 4
+			path: src/Security/Authorization.php
+
+		-
+			message: "#^Cannot call method close\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 4
+			path: src/Security/Authorization.php
+
+		-
+			message: "#^Cannot call method execute\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 4
+			path: src/Security/Authorization.php
+
+		-
+			message: "#^Cannot call method fetch_assoc\\(\\) on mysqli_result\\|false\\.$#"
+			count: 4
+			path: src/Security/Authorization.php
+
+		-
+			message: "#^Cannot call method get_result\\(\\) on mysqli_stmt\\|false\\.$#"
+			count: 3
+			path: src/Security/Authorization.php
