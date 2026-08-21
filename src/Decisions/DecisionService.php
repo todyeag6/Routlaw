@@ -248,6 +248,83 @@ final class DecisionService
     }
 
     /**
+     * T13.2 — capture the actual outcome of an executed decision (FR-060). Tenant-scoped.
+     *
+     * @return int outcome id
+     */
+    public function recordOutcome(
+        int $companyId,
+        int $decisionCaseId,
+        string $outcome,
+        ?string $notes,
+        ?string $occurredAt,
+        int $actorId
+    ): int {
+        $stmt = $this->db->prepare(
+            'INSERT INTO decision_outcomes (company_id, decision_case_id, outcome, notes, occurred_at) '
+            . 'VALUES (?, ?, ?, ?, ?)'
+        );
+        if ($stmt === false) {
+            throw new \RuntimeException('Failed to prepare decision_outcomes insert: ' . $this->db->error);
+        }
+        $params = [$companyId, $decisionCaseId, $outcome, $notes, $occurredAt];
+        $types = 'iisss';
+        $this->assertBindArity($stmt, $types, $params);
+        $stmt->bind_param($types, ...$params);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new \RuntimeException('Failed to record outcome: ' . $this->db->error);
+        }
+        $id = (int) $this->db->insert_id;
+        $stmt->close();
+        (new AuditLog($this->db))->recordSystem('decision.outcome', $companyId, 'user', 'create',
+            ['outcome_id' => $id, 'outcome' => $outcome], 'decision_outcomes', (string) $id);
+        return $id;
+    }
+
+    /**
+     * T13.2 — record predicted-vs-actual variance (FR-061).
+     * variance_value = actual − predicted; computed here so it is derived, not entered.
+     *
+     * @param float|null $predicted
+     * @param float|null $actual
+     * @return int variance id
+     */
+    public function recordVariance(
+        int $companyId,
+        int $decisionCaseId,
+        ?int $decisionOutcomeId,
+        ?string $varianceClass,
+        ?float $predicted,
+        ?float $actual,
+        ?string $detailJson,
+        int $actorId
+    ): int {
+        $variance = ($predicted === null || $actual === null) ? null : round($actual - $predicted, 4);
+        $stmt = $this->db->prepare(
+            'INSERT INTO prediction_variances '
+            . '(company_id, decision_case_id, decision_outcome_id, variance_class, predicted_value, actual_value, variance_value, detail_json) '
+            . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        if ($stmt === false) {
+            throw new \RuntimeException('Failed to prepare prediction_variances insert: ' . $this->db->error);
+        }
+        $params = [$companyId, $decisionCaseId, $decisionOutcomeId, $varianceClass, $predicted, $actual, $variance, $detailJson];
+        $types = 'iiisddds';
+        $this->assertBindArity($stmt, $types, $params);
+        $stmt->bind_param($types, ...$params);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new \RuntimeException('Failed to record variance: ' . $this->db->error);
+        }
+        $id = (int) $this->db->insert_id;
+        $stmt->close();
+        (new AuditLog($this->db))->recordSystem('decision.variance', $companyId, 'user', 'create',
+            ['variance_id' => $id, 'variance_class' => $varianceClass], 'prediction_variances', (string) $id);
+        return $id;
+    }
+
+    /**
      * Guard against the bind_param type-count pitfall (mem_3ac32f9e4c59): a shifted or wrong
      * type string causes SILENT data truncation with no error. Assert BOTH arity AND that
      * each type char matches the runtime type of its param (catches 'i' used for a string).
