@@ -28,3 +28,6 @@ storage/documents/*
 
 # PHPUnit cache
 .phpunit.cache/
+
+# Docx extraction scratch (build-time only)
+frd_extract/
