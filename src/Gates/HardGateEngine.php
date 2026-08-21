@@ -143,6 +143,109 @@ final class HardGateEngine
         return (int) $v;
     }
 
+    /**
+     * FR-016 non-CDL risk review / compliance flag.
+     *
+     * The system shall flag potential CDL/weight-rating, hazmat, commodity, HOS, ELD,
+     * and authority risks. Critically: hazmat / HOS / ELD reference data DO NOT exist
+     * in the current schema (no carrier-entered values), and inventing regulatory
+     * thresholds would violate BR-005 (no fabrication). Therefore those axes ABSTAIN
+     * (route to human) rather than guess. Only the CDL *determination* that is actually
+     * stored on the carrier (cdl_status) is evaluated.
+     *
+     * @param array<string,mixed> $carrier  Carrier row (must carry cdl_status after T10.0).
+     * @param array<string,mixed> $load     Normalized load record (commodity etc., for future use).
+     * @param array<string,mixed>|null $equipment Equipment profile (for future use).
+     * @return list<GateResult>
+     */
+    public function evaluateCompliance(array $carrier, array $load, ?array $equipment): array
+    {
+        return [
+            $this->gateCdlStatus($carrier),
+            $this->gateHazmat($carrier, $load),
+            $this->gateHos($carrier, $load),
+            $this->gateEld($carrier, $load),
+        ];
+    }
+
+    /**
+     * CDL determination gate. We do NOT invent weight thresholds (that would be a
+     * fabricated regulatory value). We only assert that a CDL determination exists.
+     * 'unknown' → ABSTAIN (cannot recommend without a determination). Any explicit
+     * determination (non_cdl / cdl_a / cdl_b / cdl_c) → PASS on this axis.
+     *
+     * @param array<string,mixed> $carrier
+     */
+    private function gateCdlStatus(array $carrier): GateResult
+    {
+        $status = (string) ($carrier['cdl_status'] ?? 'unknown');
+        if ($status === 'unknown' || $status === '') {
+            return new GateResult('cdl', GateResult::ABSTAIN, 'cdl_unknown',
+                'Carrier CDL status is unknown; cannot make a CDL determination. Route to human review.',
+                ['cdl_status' => $status]);
+        }
+        return new GateResult('cdl', GateResult::PASS, 'cdl_determined',
+            sprintf("Carrier CDL status is determined ('%s').", $status),
+            ['cdl_status' => $status]);
+    }
+
+    /**
+     * Hazmat gate. No hazmat class/placarding data exists in the system → ABSTAIN.
+     * Never fabricate a hazmat class or assume non-hazmat.
+     *
+     * @param array<string,mixed> $carrier
+     * @param array<string,mixed> $load
+     */
+    private function gateHazmat(array $carrier, array $load): GateResult
+    {
+        $declared = $carrier['hazmat_class'] ?? $load['hazmat_class'] ?? null;
+        if ($declared === null || $declared === '') {
+            return new GateResult('hazmat', GateResult::ABSTAIN, 'hazmat_unknown',
+                'No hazmat classification data available; cannot evaluate hazmat compatibility. Route to human review.',
+                []);
+        }
+        // A declared class is present — flag for human verification of placarding/compat, but
+        // the data point itself is known (not fabricated), so this axis is not blocking here.
+        return new GateResult('hazmat', GateResult::PASS, 'hazmat_declared',
+            sprintf("Hazmat class '%s' declared; verify placarding/compatibility manually.", (string) $declared),
+            ['hazmat_class' => (string) $declared]);
+    }
+
+    /**
+     * HOS applicability gate. No HOS applicability data exists → ABSTAIN (FRD §19.2
+     * lists "Unknown HOS/ELD applicability" as an uncertainty case).
+     *
+     * @param array<string,mixed> $carrier
+     * @param array<string,mixed> $load
+     */
+    private function gateHos(array $carrier, array $load): GateResult
+    {
+        $applicability = $carrier['hos_applicability'] ?? $load['hos_applicability'] ?? null;
+        if ($applicability === null || $applicability === '') {
+            return new GateResult('hos', GateResult::ABSTAIN, 'hos_applicability_unknown',
+                'HOS applicability is unknown; route to human review (FRD §19.2).', []);
+        }
+        return new GateResult('hos', GateResult::PASS, 'hos_applicability_known',
+            'HOS applicability is known.', ['hos_applicability' => (string) $applicability]);
+    }
+
+    /**
+     * ELD applicability gate. No ELD applicability data exists → ABSTAIN.
+     *
+     * @param array<string,mixed> $carrier
+     * @param array<string,mixed> $load
+     */
+    private function gateEld(array $carrier, array $load): GateResult
+    {
+        $applicability = $carrier['eld_applicability'] ?? $load['eld_applicability'] ?? null;
+        if ($applicability === null || $applicability === '') {
+            return new GateResult('eld', GateResult::ABSTAIN, 'eld_applicability_unknown',
+                'ELD applicability is unknown; route to human review (FRD §19.2).', []);
+        }
+        return new GateResult('eld', GateResult::PASS, 'eld_applicability_known',
+            'ELD applicability is known.', ['eld_applicability' => 'known']);
+    }
+
     private function nullOrFloat(mixed $v): ?float
     {
         if ($v === null || $v === '') {

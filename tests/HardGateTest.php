@@ -124,6 +124,53 @@ final class HardGateTest extends TestCase
         $this->assertTrue($this->find($results, 'equipment_completeness')->isPass());
     }
 
+    // ----- T10.2: CDL / hazmat / HOS / ELD compliance flag (FR-016), honest ABSTAIN -----
+
+    private function carrier(array $over = []): array
+    {
+        return array_merge(['cdl_status' => 'unknown'], $over);
+    }
+
+    public function test_cdl_unknown_abstains(): void
+    {
+        $results = $this->engine->evaluateCompliance($this->carrier(['cdl_status' => 'unknown']), [], null);
+        $cdl = $this->find($results, 'cdl');
+        $this->assertTrue($cdl->isAbstain(), 'Unknown CDL status must ABSTAIN, never assume non-CDL.');
+        $this->assertSame('cdl_unknown', $cdl->reason);
+    }
+
+    public function test_cdl_determined_passes(): void
+    {
+        foreach (['non_cdl', 'cdl_a', 'cdl_b', 'cdl_c'] as $status) {
+            $results = $this->engine->evaluateCompliance($this->carrier(['cdl_status' => $status]), [], null);
+            $this->assertTrue($this->find($results, 'cdl')->isPass(), "cdl_status '{$status}' must PASS (determination present).");
+        }
+    }
+
+    public function test_hazmat_unknown_abstains_no_fabrication(): void
+    {
+        $results = $this->engine->evaluateCompliance($this->carrier(), [], null);
+        $hz = $this->find($results, 'hazmat');
+        $this->assertTrue($hz->isAbstain(), 'No hazmat data in system → ABSTAIN, never invent a class.');
+        $this->assertSame('hazmat_unknown', $hz->reason);
+    }
+
+    public function test_hos_applicability_unknown_abstains(): void
+    {
+        $results = $this->engine->evaluateCompliance($this->carrier(), [], null);
+        $hos = $this->find($results, 'hos');
+        $this->assertTrue($hos->isAbstain(), 'No HOS applicability data → ABSTAIN (FRD §19.2 uncertainty).');
+        $this->assertSame('hos_applicability_unknown', $hos->reason);
+    }
+
+    public function test_eld_applicability_unknown_abstains(): void
+    {
+        $results = $this->engine->evaluateCompliance($this->carrier(), [], null);
+        $eld = $this->find($results, 'eld');
+        $this->assertTrue($eld->isAbstain(), 'No ELD applicability data → ABSTAIN (FRD §19.2 uncertainty).');
+        $this->assertSame('eld_applicability_unknown', $eld->reason);
+    }
+
     private function find(array $results, string $gate): GateResult
     {
         foreach ($results as $r) {
