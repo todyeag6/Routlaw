@@ -38,6 +38,24 @@ $_ENV['RL_DB_USER']   ??= 'root';
 $_ENV['RL_DB_PASS']   ??= '';
 $_ENV['RL_DB_NAME']   ??= 'routlaw';
 $_ENV['RL_DB_PORT']   ??= '3306';
+
+// --- Outbound email (Apple iCloud SMTP via PHPMailer; STARTTLS on 587) ---
+// Production: set these in secrets.local.php / hPanel env. Empty = mail disabled (dev safe).
+$_ENV['RL_SMTP_HOST']     ??= 'smtp.mail.me.com';
+$_ENV['RL_SMTP_PORT']     ??= '587';
+$_ENV['RL_SMTP_USERNAME'] ??= '';
+$_ENV['RL_SMTP_PASSWORD'] ??= '';
+$_ENV['RL_SMTP_FROM']     ??= '';
+$_ENV['RL_SMTP_FROM_NAME'] ??= 'ROUTLAW';
+
+// --- Cloudflare Turnstile (bot defense for public forms; preferred over reCAPTCHA on CF) ---
+// Production: set site + secret keys in secrets.local.php / hPanel env.
+// Empty keys => verification is skipped (dev). Front-end loads the widget from RL_TURNSTILE_SITE_KEY.
+$_ENV['RL_TURNSTILE_SITE_KEY']   ??= '';
+$_ENV['RL_TURNSTILE_SECRET_KEY']  ??= '';
+// Cloudflare edge verification endpoint (siteverify). Constant; no secret.
+$_ENV['RL_TURNSTILE_VERIFY_URL'] ??= 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+
 $secretsFile = __DIR__ . '/secrets.local.php';
 if (is_file($secretsFile)) {
     // Expected to set $_ENV['RL_*'] values; @ include because it may not exist in CI.

@@ -4,7 +4,8 @@
   "type": "project",
   "license": "Proprietary",
   "require": {
-    "php": ">=8.3"
+    "php": ">=8.3",
+    "phpmailer/phpmailer": "^6.9"
   },
   "require-dev": {
     "phpunit/phpunit": "^11.5",

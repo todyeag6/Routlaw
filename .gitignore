@@ -4,8 +4,9 @@ config/secrets.local.php
 .env
 .env.local
 
-# Vendor (committed only if project policy requires; we vendor phpunit for local runs)
+# Composer (committed only if project policy requires; we vendor phpunit for local runs)
 /vendor/
+composer.phar
 
 # Scratch / extraction artifacts
 .extract_venv/
