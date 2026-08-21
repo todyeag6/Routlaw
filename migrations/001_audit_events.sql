@@ -74,13 +74,15 @@ CREATE TABLE IF NOT EXISTS tool_calls (
 -- UPDATE or DELETE audit records. These triggers enforce immutability
 -- at the data layer so that even a compromised app role cannot tamper
 -- with the audit trail.
+-- DEFINER=CURRENT_USER: bind to the deploying DB user (works on Hostinger shared
+-- where root/SUPER is unavailable). No hardcoded root@localhost grant needed.
 DELIMITER //
-CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events
+CREATE DEFINER=CURRENT_USER TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events
 FOR EACH ROW
 BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'audit_events is append-only; UPDATE denied (BR-017)';
 END//
-CREATE TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events
+CREATE DEFINER=CURRENT_USER TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events
 FOR EACH ROW
 BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'audit_events is append-only; DELETE denied (BR-017)';
