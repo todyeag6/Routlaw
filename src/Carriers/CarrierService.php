@@ -115,15 +115,16 @@ final class CarrierService
      * Transition a carrier to a new lifecycle state (FR-005).
      * Only authorized roles may transition states (FR-005: transitions logged).
      *
-     * @param int    $carrierId Carrier to transition.
-     * @param string $newStatus Target state.
+     * @param int    $carrierId  Carrier to transition.
+     * @param string $newStatus  Target state.
      * @param int    $actorRoleId Role ID of the acting user (permission checked upstream).
+     * @param int    $companyId  Tenant scope — defense-in-depth (FR-042); scope all queries by company_id.
      * @return bool True if transition succeeded.
      * @throws \RuntimeException if the carrier is not found in the tenant.
      */
-    public function transitionState(int $carrierId, string $newStatus, int $actorRoleId): bool
+    public function transitionState(int $carrierId, string $newStatus, int $actorRoleId, int $companyId): bool
     {
-        $currentStatus = $this->getStatus($carrierId);
+        $currentStatus = $this->getStatus($carrierId, $companyId);
         if ($currentStatus === null) {
             throw new \RuntimeException('Carrier not found.');
         }
@@ -137,11 +138,11 @@ final class CarrierService
             return false;
         }
 
-        $stmt = $this->db->prepare('UPDATE carriers SET status = ? WHERE id = ?');
+        $stmt = $this->db->prepare('UPDATE carriers SET status = ? WHERE id = ? AND company_id = ?');
         if ($stmt === false) {
             throw new \RuntimeException('Failed to prepare carrier status update: ' . $this->db->error);
         }
-        $stmt->bind_param('si', $newStatus, $carrierId);
+        $stmt->bind_param('sii', $newStatus, $carrierId, $companyId);
         $ok = $stmt->execute();
         $stmt->close();
 
@@ -184,15 +185,16 @@ final class CarrierService
 
     /**
      * Get the current status of a carrier (tenant-scoped read).
+     *
      * @return string|null
      */
-    private function getStatus(int $carrierId): ?string
+    private function getStatus(int $carrierId, int $companyId): ?string
     {
-        $stmt = $this->db->prepare('SELECT status FROM carriers WHERE id = ? AND deleted_at IS NULL');
+        $stmt = $this->db->prepare('SELECT status FROM carriers WHERE id = ? AND company_id = ? AND deleted_at IS NULL');
         if ($stmt === false) {
             throw new \RuntimeException('Failed to prepare status query: ' . $this->db->error);
         }
-        $stmt->bind_param('i', $carrierId);
+        $stmt->bind_param('ii', $carrierId, $companyId);
         $stmt->execute();
         $result = $stmt->get_result();
         $row = $result !== false ? $result->fetch_assoc() : false;

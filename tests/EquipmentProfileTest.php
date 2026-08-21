@@ -74,15 +74,14 @@ final class EquipmentProfileTest extends TestCase
 
         // Create a carrier for equipment profiles (start at active).
         $this->carrierId = self::$carrierSvc->signup($companyA, 'Alpha Haul', '', 'DOT-A1', 'MC-A1', 'EIN-A1');
-        self::$carrierSvc->transitionState($this->carrierId, 'under_review', $carrierRole);
-        self::$carrierSvc->transitionState($this->carrierId, 'active', $dispatcher);
+        self::$carrierSvc->transitionState($this->carrierId, 'under_review', $carrierRole, $companyA);
+        self::$carrierSvc->transitionState($this->carrierId, 'active', $dispatcher, $companyA);
     }
 
     private int $carrierId;
     private int $companyA;
     private int $dispatcher;
     private int $carrierRole;
-    private int $dispatcherRole;
 
     /** FR-006/BR-002: multiple equipment profiles per carrier. */
     public function test_multiple_profiles_per_carrier(): void
@@ -172,7 +171,7 @@ final class EquipmentProfileTest extends TestCase
         ]);
         $this->assertGreaterThan(0, $id);
 
-        $ok = self::$svc->approveProfile($id);
+        $ok = self::$svc->approveProfile($id, $this->companyA);
         $this->assertFalse($ok, 'Incomplete profiles must not be approvable (FR-006/BR-002).');
 
         $row = self::$m->query('SELECT status FROM equipment_profiles WHERE id = ' . (int) $id)->fetch_assoc();
@@ -189,7 +188,7 @@ final class EquipmentProfileTest extends TestCase
             'is_complete' => true,
         ]);
 
-        $ok = self::$svc->approveProfile($id);
+        $ok = self::$svc->approveProfile($id, $this->companyA);
         $this->assertTrue($ok, 'Complete profiles must be approvable (FR-006/BR-002).');
 
         $row = self::$m->query('SELECT status FROM equipment_profiles WHERE id = ' . (int) $id)->fetch_assoc();

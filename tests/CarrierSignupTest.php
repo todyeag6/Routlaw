@@ -6,7 +6,6 @@ namespace Tests;
 use PHPUnit\Framework\TestCase;
 use Routlaw\Db\Connection;
 use Routlaw\Security\Auth;
-use Routlaw\Security\UserSession;
 use Routlaw\Carriers\CarrierService;
 
 /**
@@ -131,7 +130,7 @@ final class CarrierSignupTest extends TestCase
     public function test_state_transition_new_to_under_review(): void
     {
         $id = self::$svc->signup($this->companyA, 'Alpha Haul', '', 'DOT-TR1', 'MC-1', 'EIN-1');
-        $ok = self::$svc->transitionState($id, 'under_review', $this->carrierRole);
+        $ok = self::$svc->transitionState($id, 'under_review', $this->carrierRole, $this->companyA);
         $this->assertTrue($ok, 'new -> under_review must be allowed (FR-005).');
 
         $row = self::$m->query('SELECT status FROM carriers WHERE id = ' . (int) $id)->fetch_assoc();
@@ -142,8 +141,8 @@ final class CarrierSignupTest extends TestCase
     public function test_state_transition_under_review_to_active(): void
     {
         $id = self::$svc->signup($this->companyA, 'Alpha Haul', '', 'DOT-TR2', 'MC-1', 'EIN-1');
-        self::$svc->transitionState($id, 'under_review', $this->carrierRole);
-        $ok = self::$svc->transitionState($id, 'active', $this->carrierRole);
+        self::$svc->transitionState($id, 'under_review', $this->carrierRole, $this->companyA);
+        $ok = self::$svc->transitionState($id, 'active', $this->carrierRole, $this->companyA);
         $this->assertTrue($ok, 'under_review -> active must be allowed (FR-005).');
     }
 
@@ -151,9 +150,9 @@ final class CarrierSignupTest extends TestCase
     public function test_invalid_state_transition_rejected(): void
     {
         $id = self::$svc->signup($this->companyA, 'Alpha Haul', '', 'DOT-TR3', 'MC-1', 'EIN-1');
-        self::$svc->transitionState($id, 'under_review', $this->carrierRole);
-        self::$svc->transitionState($id, 'active', $this->carrierRole);
-        $ok = self::$svc->transitionState($id, 'new', $this->carrierRole);
+        self::$svc->transitionState($id, 'under_review', $this->carrierRole, $this->companyA);
+        self::$svc->transitionState($id, 'active', $this->carrierRole, $this->companyA);
+        $ok = self::$svc->transitionState($id, 'new', $this->carrierRole, $this->companyA);
         $this->assertFalse($ok, 'active -> new is not a permitted transition (FR-005).');
     }
 
@@ -161,7 +160,7 @@ final class CarrierSignupTest extends TestCase
     public function test_state_transition_logged_to_history(): void
     {
         $id = self::$svc->signup($this->companyA, 'Alpha Haul', '', 'DOT-TR4', 'MC-1', 'EIN-1');
-        self::$svc->transitionState($id, 'under_review', $this->carrierRole);
+        self::$svc->transitionState($id, 'under_review', $this->carrierRole, $this->companyA);
 
         $row = self::$m->query(
             'SELECT * FROM carrier_status_history WHERE carrier_id = ' . (int) $id . ' ORDER BY id DESC LIMIT 1'
@@ -176,13 +175,7 @@ final class CarrierSignupTest extends TestCase
     {
         $id = self::$svc->signup($this->companyA, 'Alpha Haul', '', 'DOT-ISO', 'MC-1', 'EIN-1');
         $carriers = self::$svc->listForTenant($this->companyB);
-        $this->assertNotContains((int) $id, $carriers, 'Other tenant must not see this carrier (SEC-010/FR-042).');
-    }
-
-    private function loginAs(string $email, string $pass): UserSession
-    {
-        $user = self::$auth->login($email, $pass);
-        $this->assertNotNull($user, "Login failed for {$email}");
-        return $user;
+        $carrierIds = array_column($carriers, 'id');
+        $this->assertNotContains((int) $id, $carrierIds, 'Other tenant must not see this carrier (SEC-010/FR-042).');
     }
 }

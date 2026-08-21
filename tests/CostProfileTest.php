@@ -76,8 +76,8 @@ final class CostProfileTest extends TestCase
 
         // Create a carrier and promote to active.
         $this->carrierId = self::$carrierSvc->signup($companyA, 'Alpha Haul', '', 'DOT-C1', 'MC-C1', 'EIN-C1');
-        self::$carrierSvc->transitionState($this->carrierId, 'under_review', $carrierRole);
-        self::$carrierSvc->transitionState($this->carrierId, 'active', $dispatcher);
+        self::$carrierSvc->transitionState($this->carrierId, 'under_review', $carrierRole, $companyA);
+        self::$carrierSvc->transitionState($this->carrierId, 'active', $dispatcher, $companyA);
     }
 
     private int $carrierId;

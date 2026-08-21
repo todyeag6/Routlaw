@@ -151,12 +151,15 @@ final class EquipmentProfileService
      * Approve an equipment profile (FR-006/BR-002).
      * Incomplete profiles can never be approved.
      *
-     * @return bool True if approved, false if already approved/incomplete/wrong state.
+     * @param int $profileId   Profile to approve.
+     * @param int $companyId   Tenant scope — defense-in-depth (FR-042); the query is scoped
+     *                         to company_id so cross-tenant writes cannot occur.
+     * @return bool True if approved, false if already approved/incomplete/wrong state/not found.
      */
-    public function approveProfile(int $profileId): bool
+    public function approveProfile(int $profileId, int $companyId): bool
     {
         // Check completeness — incomplete profiles cannot be approved (FR-006/BR-002).
-        $row = $this->fetchProfile($profileId);
+        $row = $this->fetchProfile($profileId, $companyId);
         if ($row === null) {
             return false;
         }
@@ -173,12 +176,12 @@ final class EquipmentProfileService
             return false;
         }
 
-        $stmt = $this->db->prepare('UPDATE equipment_profiles SET status = ? WHERE id = ?');
+        $stmt = $this->db->prepare('UPDATE equipment_profiles SET status = ? WHERE id = ? AND company_id = ?');
         if ($stmt === false) {
             throw new \RuntimeException('Failed to prepare approve query: ' . $this->db->error);
         }
         $newStatus = self::STATUS_APPROVED;
-        $stmt->bind_param('si', $newStatus, $profileId);
+        $stmt->bind_param('sii', $newStatus, $profileId, $companyId);
         $ok = $stmt->execute();
         $stmt->close();
 
@@ -226,20 +229,21 @@ final class EquipmentProfileService
     }
 
     /**
-     * Fetch a single profile by ID.
+     * Fetch a single profile by ID, tenant-scoped (FR-042).
+     *
      * @return array<string,mixed>|null
      */
-    private function fetchProfile(int $profileId): ?array
+    private function fetchProfile(int $profileId, int $companyId): ?array
     {
         $stmt = $this->db->prepare(
             'SELECT id, company_id, carrier_id, truck_type, trailer_type, truck_gvwr_lbs, '
             . 'trailer_gvwr_lbs, gcwr_lbs, payload_capacity_lbs, deck_length_ft, deck_width_ft, '
-            . 'capabilities, is_complete, status FROM equipment_profiles WHERE id = ? AND deleted_at IS NULL'
+            . 'capabilities, is_complete, status FROM equipment_profiles WHERE id = ? AND company_id = ? AND deleted_at IS NULL'
         );
         if ($stmt === false) {
             throw new \RuntimeException('Failed to prepare profile fetch: ' . $this->db->error);
         }
-        $stmt->bind_param('i', $profileId);
+        $stmt->bind_param('ii', $profileId, $companyId);
         $stmt->execute();
         $result = $stmt->get_result();
         $row = $result !== false ? $result->fetch_assoc() : null;
