@@ -7,6 +7,7 @@ use Routlaw\Security\AuditLog;
 use Routlaw\Security\Authorization;
 use Routlaw\Security\AuthorizationException;
 use Routlaw\Security\UserSession;
+use Routlaw\Approvals\ApprovalService;
 
 /**
  * T16 — DocumentService (FR-025/026/027/028).
@@ -21,6 +22,8 @@ final class DocumentService
     private \mysqli $db;
     private Authorization $authz;
     private string $storageRoot;
+    private TokenStore $tokens;
+    private ApprovalService $approvals;
 
     /** @var list<string> MIME types accepted for upload. */
     private const ALLOWED_MIME = ['application/pdf', 'image/jpeg', 'image/png', 'text/plain'];
@@ -28,11 +31,18 @@ final class DocumentService
     /**
      * @param string $storageRoot Absolute, non-web path (e.g. /srv/routlaw/storage/documents).
      */
-    public function __construct(\mysqli $db, Authorization $authz, string $storageRoot)
-    {
+    public function __construct(
+        \mysqli $db,
+        Authorization $authz,
+        string $storageRoot,
+        ?TokenStore $tokens = null,
+        ?ApprovalService $approvals = null
+    ) {
         $this->db = $db;
         $this->authz = $authz;
         $this->storageRoot = rtrim($storageRoot, '/\\');
+        $this->tokens = $tokens ?? new TokenStore($db);
+        $this->approvals = $approvals ?? new ApprovalService($db);
     }
 
     /**
@@ -209,6 +219,68 @@ final class DocumentService
                 throw new \LogicException(sprintf('bind_param type mismatch at param %d: "%s" expects %s, got %s', $i, $types[$i], $want, gettype($p)));
             }
         }
+    }
+
+    /**
+     * Share a private document (FR-027) — approval-gated, cannot self-approve.
+     *
+     * A human sharer requests a share; a DISTINCT human approver must approve it
+     * (payload-bound: the share request + approver identity are hashed). On approval
+     * the approval is consumed (single-use) and a single-use download token is issued.
+     * No agent/model parameter exists — sharing is a human-only control surface.
+     *
+     * @param array<string,mixed> $payload Share request (recipient, reason, ...).
+     * @param UserSession $approver A DISTINCT human approver (cannot equal the sharer).
+     * @return string 64-hex single-use download token.
+     * @throws AuthorizationException on perm-denied or self-approve.
+     */
+    public function share(int $companyId, int $docId, UserSession $sharer, array $payload, UserSession $approver): string
+    {
+        // 1. Permission gate: the sharer must hold documents.share.
+        if (!$this->authz->hasPermission($sharer->userId, $companyId, 'documents.share')) {
+            throw new AuthorizationException('documents.share', 'denied: documents.share');
+        }
+        // 2. Cannot self-approve: sharer and approver must be distinct humans.
+        if ($sharer->userId === $approver->userId) {
+            throw new AuthorizationException('self_approve', 'cannot self-approve share');
+        }
+
+        // 3. Document must exist in tenant (tenant-scoped read).
+        $row = $this->db->query(
+            "SELECT id FROM documents WHERE id = $docId AND company_id = $companyId AND deleted_at IS NULL LIMIT 1"
+        );
+        if (!($row instanceof \mysqli_result) || $row->fetch_assoc() === null) {
+            throw new AuthorizationException('document', 'document not found in tenant');
+        }
+
+        // 4. Payload-bound approval (tamper/replay binding to the share request).
+        $approvalId = $this->approvals->create(
+            $companyId, $approver->userId, 'document.share', 'document', $docId, $payload, '+1 day'
+        );
+        // 5. Distinct approver approves + we verify + consume single-use.
+        $approved = $this->approvals->approve($approvalId, $companyId, $approver, $payload);
+        if (!$approved) {
+            throw new \RuntimeException('Approval transition failed');
+        }
+        if (!$this->approvals->isApproved('document.share', 'document', $docId, $payload, [$companyId])) {
+            throw new \RuntimeException('Approval not valid for share payload');
+        }
+        $consumed = $this->approvals->consume('document.share', 'document', $docId, $payload, [$companyId]);
+        if (!$consumed) {
+            throw new \RuntimeException('Approval already consumed (replay)');
+        }
+
+        // 6. Issue a single-use download token (the only way to retrieve the file).
+        $token = $this->tokens->issue($docId, $companyId, '+1 day');
+
+        // 7. Audit the human-approved share.
+        $audit = new AuditLog($this->db);
+        $audit->record($sharer, 'document.share', 'document', (string) $docId, 'success', [
+            'approver' => $approver->userId,
+            'recipient' => (string) ($payload['recipient'] ?? ''),
+        ]);
+
+        return $token;
     }
 
     private function lastInsertId(): int
