@@ -16,7 +16,7 @@ use PHPMailer\PHPMailer\Exception as PHPMailerException;
  *
  * Cloudflare sits in front of the domain; Apple SMTP is the transport.
  */
-final class Mailer
+final class Mailer implements MailerInterface
 {
     private string $host;
     private int $port;
