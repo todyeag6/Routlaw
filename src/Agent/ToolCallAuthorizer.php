@@ -143,6 +143,33 @@ final class ToolCallAuthorizer
     }
 
     /**
+     * Record the validated, sanitized output on the most recent tool_calls row for the run/tool.
+     */
+    public function recordOutput(int $agentRunId, string $tool, string $outputHash, bool $sanitized): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE tool_calls SET output_hash = ?, sanitized = ? '
+            . 'WHERE agent_run_id = ? AND tool_name = ? ORDER BY id DESC LIMIT 1'
+        );
+        if ($stmt === false) {
+            throw new \RuntimeException('Failed to prepare tool_call output update: ' . $this->db->error);
+        }
+        $types = 'siis';
+        /** @var list<mixed> $params */
+        $params = [$outputHash, $sanitized ? 1 : 0, $agentRunId, $tool];
+        $this->assertBindArity($stmt, $types, $params);
+        $bind = [(string) $types];
+        foreach ($params as $k => $v) {
+            $bind[] = &$params[$k];
+        }
+        $stmt->bind_param(...$bind);
+        if (!$stmt->execute()) {
+            throw new \RuntimeException('Failed to record tool output: ' . $this->db->error);
+        }
+        $stmt->close();
+    }
+
+    /**
      * @param array<int, mixed> $params
      */
     private function assertBindArity(\mysqli_stmt $stmt, string $types, array $params): void
