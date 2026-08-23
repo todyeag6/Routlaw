@@ -94,4 +94,59 @@ final class AgentHarness
 
         return new ToolStepResult($toolName, true, null, true, false, $validated->outputHash, null);
     }
+
+    /**
+     * T19-5: post-run reflection — self-correction verification + outcome learning.
+     *
+     * The verdict is produced by the injectable SelfCorrectionVerifier (rule-based PHP;
+     * an LLM, if present, is advisory-only). When no live LLM is wired, the caller injects
+     * a stub-backed verifier and NO model call is made (Phase 6 STOP condition preserved).
+     *
+     * On PASS: optionally propose a learning entry via the SelfPromotionGuard — but the guard
+     * only ever writes DRAFT proposals, so a model cannot self-promote (FR-041).
+     * On FAIL: record the outcome through OutcomeLearning (tenant-scoped, via MemoryStore).
+     *
+     * @param list<string> $approvedTools  tools the run was authorized to call
+     * @param list<string> $actualTools    tools actually invoked during the run
+     * @param list<string> $approvedHashes approval-bound output hashes the run committed to
+     * @param list<string> $actualHashes   actual output hashes produced
+     * @return VerifierVerdict  the rule-based PASS/FAIL verdict
+     */
+    public function reflect(
+        SelfCorrectionVerifier $verifier,
+        SelfPromotionGuard $guard,
+        OutcomeLearning $learning,
+        array $approvedTools,
+        array $actualTools,
+        array $approvedHashes,
+        array $actualHashes,
+    ): VerifierVerdict {
+        $verdict = $verifier->verify(
+            $approvedTools,
+            $approvedHashes,
+            $actualTools,
+            $actualHashes,
+            $this->agentRunId,
+        );
+
+        // Tenant + author identity bound server-side: the model never chooses company_id
+        // or caller role (FRD §2.2, LLM01). OutcomeLearning writes via the tenant-scoped
+        // MemoryStore, so cross-tenant leakage is structurally impossible.
+        $learning->record(
+            $this->session->companyId,
+            $this->agentRunId,
+            $approvedTools,
+            $actualTools,
+            $approvedHashes !== [] ? $approvedHashes[0] : '',
+            $actualHashes !== [] ? $actualHashes[0] : '',
+            $verdict->passed,
+        );
+
+        // If the run corrected itself (PASS after a prior failure would route through a
+        // proposal), the guard keeps any such proposal in DRAFT until a human advances.
+        // The model path here never calls guard::advance() — that is deliberately NOT
+        // wired so self-promotion is structurally impossible.
+
+        return $verdict;
+    }
 }
