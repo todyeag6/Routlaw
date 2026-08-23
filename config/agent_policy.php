@@ -79,7 +79,7 @@ return [
             'required_permission' => 'loads.create',
             'writes_regulated' => false,
             'egress' => [],
-            'output_schema' => ['type' => 'object', 'properties' => ['entry_id' => ['type' => 'integer']], 'required' => ['entry_id']],
+            'output_schema' => ['type' => 'object', 'properties' => ['entry_id' => ['type' => 'integer'], 'content' => ['type' => 'string']], 'required' => ['entry_id', 'content']],
         ],
         'memory.read' => [
             'requires_approval' => false,
