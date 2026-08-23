@@ -45,20 +45,55 @@ if ($m->connect_error) {
 $m->set_charset('utf8mb4');
 $m->query("SET SESSION time_zone = '+00:00'");
 
+// Track applied migrations so re-running is idempotent (safe to call repeatedly).
+$m->query(
+    'CREATE TABLE IF NOT EXISTS migrations_log ('
+    . 'id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, '
+    . 'migration VARCHAR(191) NOT NULL UNIQUE, '
+    . 'applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP'
+    . ') CHARACTER SET utf8mb4'
+);
+
 $migDir = $root . '/migrations';
+
+// Backfill the log if the DB was provisioned by an earlier run that predated tracking.
+$logCount = (int) $m->query('SELECT COUNT(*) AS c FROM migrations_log')->fetch_assoc()['c'];
+$alreadyProvisioned = $m->query("SHOW TABLES LIKE 'companies'")->num_rows > 0;
+if ($logCount === 0 && $alreadyProvisioned) {
+    echo "Backfilling migrations_log from existing schema (prior provision, no tracking)...\n";
+    for ($i = 0; $i <= 16; $i++) {
+        $matches = glob($migDir . '/' . str_pad((string) $i, 3, '0', STR_PAD_LEFT) . '_*.sql');
+        if ($matches === []) {
+            continue;
+        }
+        $file = basename($matches[0]);
+        $m->query("INSERT IGNORE INTO migrations_log (migration) VALUES ('{$m->real_escape_string($file)}')");
+    }
+    echo "Backfill complete.\n";
+}
+
 $applied = 0;
+$skipped = 0;
 for ($i = 0; $i <= 16; $i++) {
     $matches = glob($migDir . '/' . str_pad((string) $i, 3, '0', STR_PAD_LEFT) . '_*.sql');
     if ($matches === []) {
         echo "NO MIGRATION FILE FOR $i (expected; migrations may not be sequential)\n";
         continue;
     }
-    echo 'Applying ' . basename($matches[0]) . ' ... ';
+    $file = basename($matches[0]);
+    $already = $m->query("SELECT 1 FROM migrations_log WHERE migration = '{$m->real_escape_string($file)}' LIMIT 1");
+    if ($already && $already->num_rows > 0) {
+        echo "SKIP (already applied): {$file}\n";
+        $skipped++;
+        continue;
+    }
+    echo "Applying {$file} ... ";
     \Routlaw\Db\Connection::applyFile($m, $matches[0]);
+    $m->query("INSERT INTO migrations_log (migration) VALUES ('{$m->real_escape_string($file)}')");
     echo "OK\n";
     $applied++;
 }
-echo "MIGRATIONS APPLIED: {$applied}\n";
+echo "MIGRATIONS APPLIED THIS RUN: {$applied} (skipped already-applied: {$skipped})\n";
 
 $res = $m->query('SHOW TABLES');
 $n = $res ? $res->num_rows : 0;

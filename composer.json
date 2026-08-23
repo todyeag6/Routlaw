@@ -13,7 +13,8 @@
   },
   "scripts": {
     "test": "php vendor/bin/phpunit --no-coverage",
-    "guard": "php scripts/guard.php"
+    "guard": "php scripts/guard.php",
+    "db:provision": "php scripts/provision_db.php"
   },
   "autoload": {
     "psr-4": {
