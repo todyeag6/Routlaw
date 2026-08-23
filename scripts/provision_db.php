@@ -61,26 +61,23 @@ $logCount = (int) $m->query('SELECT COUNT(*) AS c FROM migrations_log')->fetch_a
 $alreadyProvisioned = $m->query("SHOW TABLES LIKE 'companies'")->num_rows > 0;
 if ($logCount === 0 && $alreadyProvisioned) {
     echo "Backfilling migrations_log from existing schema (prior provision, no tracking)...\n";
-    for ($i = 0; $i <= 16; $i++) {
-        $matches = glob($migDir . '/' . str_pad((string) $i, 3, '0', STR_PAD_LEFT) . '_*.sql');
-        if ($matches === []) {
-            continue;
-        }
-        $file = basename($matches[0]);
+    $allFiles = glob($migDir . '/[0-9][0-9][0-9]_*.sql') ?: [];
+    sort($allFiles);
+    foreach ($allFiles as $path) {
+        $file = basename($path);
         $m->query("INSERT IGNORE INTO migrations_log (migration) VALUES ('{$m->real_escape_string($file)}')");
     }
-    echo "Backfill complete.\n";
+    echo "Backfill complete (" . count($allFiles) . " entries).\n";
 }
 
+// Discover + apply migrations dynamically (do NOT hardcode a numeric ceiling — a new
+// migration file must be applied on the next provision even if this script wasn't updated).
 $applied = 0;
 $skipped = 0;
-for ($i = 0; $i <= 16; $i++) {
-    $matches = glob($migDir . '/' . str_pad((string) $i, 3, '0', STR_PAD_LEFT) . '_*.sql');
-    if ($matches === []) {
-        echo "NO MIGRATION FILE FOR $i (expected; migrations may not be sequential)\n";
-        continue;
-    }
-    $file = basename($matches[0]);
+$allFiles = glob($migDir . '/[0-9][0-9][0-9]_*.sql') ?: [];
+sort($allFiles);
+foreach ($allFiles as $path) {
+    $file = basename($path);
     $already = $m->query("SELECT 1 FROM migrations_log WHERE migration = '{$m->real_escape_string($file)}' LIMIT 1");
     if ($already && $already->num_rows > 0) {
         echo "SKIP (already applied): {$file}\n";
@@ -88,7 +85,7 @@ for ($i = 0; $i <= 16; $i++) {
         continue;
     }
     echo "Applying {$file} ... ";
-    \Routlaw\Db\Connection::applyFile($m, $matches[0]);
+    \Routlaw\Db\Connection::applyFile($m, $path);
     $m->query("INSERT INTO migrations_log (migration) VALUES ('{$m->real_escape_string($file)}')");
     echo "OK\n";
     $applied++;
