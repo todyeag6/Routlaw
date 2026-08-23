@@ -18,7 +18,10 @@ ALTER TABLE agent_runs
 -- T17: extend tool_calls with allowlist decision + output validation/sanitization trace.
 -- AuditLog::recordToolCall inserts (company_id, agent_run_id, tool_name, request_hash,
 -- result_status) only; additions are nullable-with-default and never reorder.
+-- agent_run_id is relaxed to NULLABLE so a denied call can be recorded even when no
+-- agent run has yet been persisted (defense-in-depth audit trace).
 ALTER TABLE tool_calls
+    MODIFY COLUMN agent_run_id BIGINT UNSIGNED NULL,
     ADD COLUMN IF NOT EXISTS allowed       TINYINT(1) NOT NULL DEFAULT 1 AFTER result_status,
     ADD COLUMN IF NOT EXISTS deny_reason   VARCHAR(255) NULL AFTER allowed,
     ADD COLUMN IF NOT EXISTS output_hash   VARCHAR(64) NULL AFTER deny_reason,

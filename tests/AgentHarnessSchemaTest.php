@@ -58,6 +58,10 @@ final class AgentHarnessSchemaTest extends TestCase
             $r = self::$m->query("SHOW COLUMNS FROM tool_calls LIKE '{$col}'");
             $this->assertSame(1, $r->num_rows, "tool_calls.{$col} missing (T17 allowlist decision trace).");
         }
+        // agent_run_id must be nullable so a denied call can be audited without a persisted run.
+        $r = self::$m->query("SHOW COLUMNS FROM tool_calls LIKE 'agent_run_id'");
+        $row = $r->fetch_assoc();
+        $this->assertSame('YES', $row['Null'] ?? '', 'tool_calls.agent_run_id must be nullable (T17 audit trace).');
     }
 
     public function test_system_flags_for_kill_switch(): void
