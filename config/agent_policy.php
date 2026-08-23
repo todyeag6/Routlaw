@@ -49,7 +49,7 @@ return [
             'requires_approval' => false,
             'required_permission' => 'loads.create',
             'writes_regulated' => false,
-            'egress' => [],
+            'egress' => ['api.routlaw.local'],
             'output_schema' => ['type' => 'object', 'properties' => ['extraction_id' => ['type' => 'integer']], 'required' => ['extraction_id']],
         ],
         'draft.message' => [
