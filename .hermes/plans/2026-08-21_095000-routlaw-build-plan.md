@@ -111,6 +111,8 @@ Each phase = a vertical slice, TDD, with its own verification gate. Phases build
 - T17. `AG-01..11` + `HAR-01..15` secure harness: tool allowlist, per-call authz, schema validation, egress control, secrets isolation (opaque handles), resource budgets, kill switch, version pinning, output sanitization. Test: model cannot grant itself tools; bounded steps prevent infinite loops (FR-032).
 - T18. `FR-034..037` memory entries (provenance, tenant/role-filtered retrieval BEFORE semantic search), contradiction handling, expiry/revalidation. Test: cross-tenant retrieval returns zero unauthorized content.
 - T19. `FR-038/039/040/041` self-correction verifier + post-outcome learning + proposals that **cannot self-promote** (versioned, evaluated, approved, staged, rollback).
+  - DONE 2026-08-23 (owner authorized local Ollama; Decision #2/#11 lifted). `OllamaClient` (qwen3.5:4b) live-probed: HTTP 200. `SelfCorrectionVerifier` rule-based PHP verdict, LLM advisory-only. `OutcomeLearning` tenant-scoped via MemoryStore (leakage=0). `SelfPromotionGuard` draft-only from model; advance/rollback human-approver-gated. `AgentHarness::reflect()` wires all three; stub/no-LLM path green. Canonical `routlaw` DB migrated (017 applied; provisioner fixed: dynamic glob replaced hardcoded 0-16 ceiling).
+- Phase 6 COMPLETE (T17, T18, T19). Live-LLM hard gate lifted — local Ollama keyless backend in service.
 
 ### Phase 7 — Integrations, governance, evidence (MOD-16/17/18, BR-013/029/030)
 - T20. `FR-011/063` Gmail OAuth (narrow scopes, encrypted tokens, revocable) + authorized-source registry (owner, rights, terms, monitoring, disablement; fails closed).
