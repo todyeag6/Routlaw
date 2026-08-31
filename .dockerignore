@@ -1,0 +1,13 @@
+.git
+.github
+.hermes
+vendor
+config/secrets.local.php
+.env
+.env.local
+node_modules
+.phpunit.result.cache
+.phpunit.cache
+__pycache__
+composer.phar
+*.cache
