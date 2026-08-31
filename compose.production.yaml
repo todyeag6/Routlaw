@@ -1,0 +1,13 @@
+services:
+  app:
+    restart: always
+    environment:
+      RL_DB_HOST: ${RL_DB_HOST}
+      RL_DB_USER: ${RL_DB_USER}
+      RL_DB_PASS: ${RL_DB_PASS}
+      RL_DB_NAME: ${RL_DB_NAME}
+      RL_DB_PORT: ${RL_DB_PORT:-3306}
+  db:
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}

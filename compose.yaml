@@ -1,0 +1,40 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8081:80"
+    environment:
+      RL_DB_HOST: db
+      RL_DB_USER: routlaw
+      RL_DB_PASS: routlaw_dev
+      RL_DB_NAME: routlaw
+      RL_DB_PORT: "3306"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [routlaw_net]
+
+  db:
+    image: mariadb:11@sha256:2439dcd7d14010ecd1ff7a4e1c5abe8e208c34fe35290744deeeaac3569043c3
+    environment:
+      MARIADB_DATABASE: routlaw
+      MARIADB_USER: routlaw
+      MARIADB_PASSWORD: routlaw_dev
+      MARIADB_ROOT_PASSWORD: routlaw_root_dev
+    volumes: [routlaw_db_data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+    networks: [routlaw_net]
+
+volumes:
+  routlaw_db_data:
+
+networks:
+  routlaw_net:
+    driver: bridge
