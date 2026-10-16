@@ -1,8 +1,11 @@
 services:
   app:
     build: .
+    # Loopback-only publish: the bare "8081:80" form binds 0.0.0.0. This host
+    # has an inbound ALLOW rule for 8081-8112, so 0.0.0.0 is LAN-reachable.
+    # Ref: https://docs.docker.com/engine/network/port-publishing/
     ports:
-      - "8081:80"
+      - "127.0.0.1:8081:80"
     environment:
       RL_DB_HOST: db
       RL_DB_USER: routlaw
