@@ -1,13 +1,14 @@
 # ROUTLAW — AGENTS.md
 
-All-PHP 8.3 / XAMPP / MariaDB freight & carrier platform. This file is the
+All-PHP 8.5 / XAMPP / MariaDB freight & carrier platform. This file is the
 authoritative project context for any agent session rooted here — it loads
 automatically. Trust it over chat summary; if it disagrees with the code,
 the code is ground truth and this file should be updated.
 
 ## Stack (do not assume the bundled defaults)
-- **PHP:** host-wide 8.3 at `C:/php83/php.exe` (8.3.33, has `sodium`).
-  **Never** XAMPP's bundled 8.2.12 for composer / phpstan / phpunit.
+- **PHP:** XAMPP-bundled 8.5.12 at `C:/xampp/php/php.exe` (ZTS; mod_php + CLI,
+  has `sodium`). Use it for composer / phpstan / phpunit. The standalone
+  `C:/php83` (8.3.33) is archived — do not use it.
 - **DB:** MariaDB via XAMPP; reach it through the app's configured DSN.
 - **Web server:** XAMPP Apache; docroot is this directory.
 
@@ -20,7 +21,7 @@ the code is ground truth and this file should be updated.
   (poolside/laguna-s-2.1:free via nous) is separate and only for planning.
 
 ## Conventions
-- TDD gate: tests before code. `phpunit` runs against the 8.3 binary.
+- TDD gate: tests before code. `phpunit` runs against the XAMPP 8.5 binary.
 - `phpstan` level 8, PHP 8.3 typed arrays. Config lives in `phpstan.neon`.
 - Tenant scoping is load-bearing — never widen a query's tenant filter.
 - Migration + extraction patterns: see the repo's existing `migrations/` and
