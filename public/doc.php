@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace Routlaw;
 
-require __DIR__ . '/../config/autoload.php';
+require __DIR__ . '/../../config/autoload.php';
 
 use Routlaw\Documents\TokenStore;
 use Routlaw\Db\Connection;

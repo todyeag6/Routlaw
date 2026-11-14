@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN docker-php-source extract \
   && docker-php-ext-install -j"$(nproc)" \
       mysqli sodium intl zip opcache \
-  && docker-php-source delete
+  && docker-php-source delete \
+  && docker-php-ext-enable opcache
 
 # Apache: Routlaw's docroot is public/.
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
